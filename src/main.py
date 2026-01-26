@@ -1,6 +1,6 @@
 import time
 from machine import I2C, Pin
-import scd4x
+import lib.scd4x as scd4x
 
 def main():
     i2c = I2C(0, sda=Pin(21), scl=Pin(22), freq=100000)
