@@ -1,8 +1,0 @@
-{
-    "stubPath": "./typings",
-    "reportMissingImports": "none",
-    "reportMissingModuleSource": "none",
-    "extraPaths": [
-        "./typings"
-    ]
-}

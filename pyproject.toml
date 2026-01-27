@@ -9,3 +9,49 @@ dependencies = [
     "mpremote>=1.27.0",
     "pyserial>=3.5",
 ]
+
+[project.optional-dependencies]
+# install to folder typings
+# uv pip install -r pyproject.toml --extra stubs --target typings 
+stubs = [
+  "micropython-esp32-stubs"
+]
+
+
+# ###################################################################
+# pyright and pylance options:
+# ###################################################################
+
+[tool.pyright]
+include = ["."]
+ignore = ["**/typings"]
+exclude = [".*", "__*", "**/typings", "**/venv", "**/.venv"]
+
+typeCheckingMode = "basic"
+# Point stubPath to root (valid dir) so it doesn't default to "typings"
+# This prevents global usage of MicroPython stubs in host scripts
+stubPath = "."
+# typeshedPath = "typings" # Removed to allow host scripts to use standard library stubs
+
+reportMissingModuleSource = "none"
+reportUnnecessaryTypeIgnoreComment = "information"
+
+# Environment for MicroPython code (src)
+[[tool.pyright.executionEnvironments]]
+root = "src"
+extraPaths = ["typings", "."]
+pythonVersion = "3.8"
+pythonPlatform = "Linux"
+
+# Environment for MicroPython libraries (lib)
+[[tool.pyright.executionEnvironments]]
+root = "lib"
+extraPaths = ["typings"]
+pythonVersion = "3.8"
+pythonPlatform = "Linux"
+
+# Environment for Host scripts (root)
+[[tool.pyright.executionEnvironments]]
+root = "."
+pythonVersion = "3.12"
+pythonPlatform = "Windows"
