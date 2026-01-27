@@ -14,10 +14,7 @@ def main():
 
     while True:
         if scd.data_ready:
-            print(f"CO2: {scd.CO2} ppm")
-            print(f"Temperature: {scd.temperature:.2f} C")
-            print(f"Humidity: {scd.relative_humidity:.2f} %")
-            print("-" * 20)
+            print(",".join([str(scd.CO2), str(scd.temperature), str(scd.relative_humidity)]))
         
         time.sleep(1)
 
