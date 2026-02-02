@@ -1,12 +1,3 @@
-# original version
-# SPDX-FileCopyrightText: 2017 Scott Shawcroft, written for Adafruit Industries
-# SPDX-FileCopyrightText: Copyright (c) 2021 ladyada for Adafruit Industries
-#
-# SPDX-License-Identifier: MIT
-#
-# this version: also Copyright (c) 2022-2024 peter-l5
-# build version: v103
-
 """
 `micropython_scd4x`
 ================================================================================
@@ -34,9 +25,6 @@ from typing import Tuple, Union
 from machine import I2C
 from micropython import const
 import struct
-
-__version__ = "v103"
-__repo__ = "https://github.com/peter-l5/MicroPython_SCD4X"
 
 SCD4X_DEFAULT_ADDR = 0x62
 _SCD4X_REINIT = const(0x3646)
