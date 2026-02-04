@@ -7,16 +7,31 @@ from datetime import datetime, timedelta
 import collections
 import sys
 import numpy as np
+import json
+import pandas as pd
 
 # Configuration
 MAX_DURATION_MINUTES = 10
 BAUD_RATE = 115200
+MOVING_AVERAGE_WINDOW = 10  # Number of points for moving average
 
 # Data storage (deques for efficient pops from the left)
 timestamps = collections.deque()
 co2_data = collections.deque()
 temp_data = collections.deque()
-hum_data = collections.deque()
+
+pms_timestamps = collections.deque()
+pm1_data = collections.deque()
+pm25_data = collections.deque()
+pm10_data = collections.deque()
+
+def calculate_moving_average(data, window_size):
+    """Calculates the simple moving average."""
+    if len(data) < window_size:
+        return list(data)
+    
+    # Use pandas rolling window for efficient calculation
+    return pd.Series(list(data)).rolling(window=window_size, min_periods=1).mean().tolist()
 
 def find_serial_port():
     """Attempts to auto-detect the ESP32 serial port."""
@@ -78,13 +93,12 @@ def update_data(frame):
             if not line:
                 continue
             
-            # Attempt to parse "CO2,temp,hum"
-            parts = line.split(',')
-            if len(parts) == 3:
-                try:
-                    co2 = float(parts[0])
-                    temp = float(parts[1])
-                    hum = float(parts[2])
+            try:
+                data = json.loads(line)
+                if data.get("sensor") == "scd41":
+                    co2 = float(data.get("co2", 0))
+                    temp = float(data.get("temperature", 0))
+                    # hum = float(data.get("humidity", 0)) # Not plotting humidity anymore
                     
                     # Use current time for the data point
                     data_time = datetime.now()
@@ -92,21 +106,35 @@ def update_data(frame):
                     timestamps.append(data_time)
                     co2_data.append(co2)
                     temp_data.append(temp)
-                    hum_data.append(hum)
                     
-                    # Enforce 10-minute window removal based on data timestamps is optional 
-                    # if we only show the window, but good to keep memory usage low.
-                    # We can use the same MAX_DURATION_MINUTES.
+                    # Enforce 10-minute window removal
                     cutoff = data_time - timedelta(minutes=MAX_DURATION_MINUTES)
                     while timestamps and timestamps[0] < cutoff:
                         timestamps.popleft()
                         co2_data.popleft()
                         temp_data.popleft()
-                        hum_data.popleft()
                         
-                except ValueError:
-                    # Ignore lines that don't parse as floats (e.g. debug text)
-                    pass
+                elif data.get("sensor") == "pms7003":
+                    pm1 = float(data.get('pm1_0', 0))
+                    pm25 = float(data.get('pm2_5', 0))
+                    pm10 = float(data.get('pm10_0', 0))
+                    
+                    data_time = datetime.now()
+                    pms_timestamps.append(data_time)
+                    pm1_data.append(pm1)
+                    pm25_data.append(pm25)
+                    pm10_data.append(pm10)
+                    
+                    cutoff = data_time - timedelta(minutes=MAX_DURATION_MINUTES)
+                    while pms_timestamps and pms_timestamps[0] < cutoff:
+                        pms_timestamps.popleft()
+                        pm1_data.popleft()
+                        pm25_data.popleft()
+                        pm10_data.popleft()
+
+            except json.JSONDecodeError:
+                # Fallback or ignore non-JSON lines
+                pass
         except Exception as e:
             print(f"Error reading/parsing serial: {e}")
 
@@ -167,18 +195,32 @@ def update_data(frame):
     if temp_data:
         ax2.set_title(f'Temperature: {temp_data[-1]:.1f} °C')
     
-    ax3.set_ylabel('Humidity (%)')
-    ax3.set_ylim(0, 100)
+    ax3.set_ylabel('PM (µg/m³)')
+    # Dynamic Y-limit for PM
+    current_max_pm = max(max(pm1_data) if pm1_data else 0, max(pm25_data) if pm25_data else 0, max(pm10_data) if pm10_data else 0)
+    ax3.set_ylim(0, current_max_pm * 1.3 if current_max_pm > 10 else 10)
     ax3.set_xlabel('Time')
     ax3.grid(True)
-    if hum_data:
-        ax3.set_title(f'Humidity: {hum_data[-1]:.1f} %')
+    if pm25_data:
+        ax3.set_title(f'PM1.0: {pm1_data[-1]}, PM2.5: {pm25_data[-1]}, PM10: {pm10_data[-1]}')
     
     # Plot data if available
     if timestamps:
-        ax1.plot(timestamps, co2_data, 'r-', label='CO2')
-        ax2.plot(timestamps, temp_data, 'g-', label='Temperature')
-        ax3.plot(timestamps, hum_data, 'b-', label='Humidity')
+        co2_ma = calculate_moving_average(co2_data, MOVING_AVERAGE_WINDOW)
+        temp_ma = calculate_moving_average(temp_data, MOVING_AVERAGE_WINDOW)
+        
+        ax1.plot(timestamps, co2_ma, 'r-', label=f'CO2 (MA{MOVING_AVERAGE_WINDOW})')
+        ax2.plot(timestamps, temp_ma, 'g-', label=f'Temp (MA{MOVING_AVERAGE_WINDOW})')
+    
+    if pms_timestamps:
+        pm1_ma = calculate_moving_average(pm1_data, MOVING_AVERAGE_WINDOW)
+        pm25_ma = calculate_moving_average(pm25_data, MOVING_AVERAGE_WINDOW)
+        pm10_ma = calculate_moving_average(pm10_data, MOVING_AVERAGE_WINDOW)
+
+        ax3.plot(pms_timestamps, pm1_ma, 'b-', label=f'PM1.0 (MA{MOVING_AVERAGE_WINDOW})')
+        ax3.plot(pms_timestamps, pm25_ma, 'y-', label=f'PM2.5 (MA{MOVING_AVERAGE_WINDOW})')
+        ax3.plot(pms_timestamps, pm10_ma, 'm-', label=f'PM10 (MA{MOVING_AVERAGE_WINDOW})')
+        ax3.legend(loc="upper left", fontsize="small")
     
     # Set fixed time window
     ax3.set_xlim(min_time, max_time)
