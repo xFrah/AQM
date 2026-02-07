@@ -91,10 +91,12 @@ ax3.set_xlabel('Time')
 ax3.grid(True)
 
 # Styling - Column 2
-ax4.set_ylabel('VOC Raw')
+ax4.set_ylabel('VOC Index')
+ax4.set_ylim(0, 500)
 ax4.grid(True)
 
-ax5.set_ylabel('NOx Raw')
+ax5.set_ylabel('NOx Index')
+ax5.set_ylim(0, 500)
 ax5.grid(True)
 
 ax6.set_ylabel('Accel Intensity (m/s²)')
@@ -151,8 +153,8 @@ def update_data(frame):
                         pm10_data.popleft()
 
                 elif sensor_type == "sgp41":
-                    voc = float(data.get('voc_raw', 0))
-                    nox = float(data.get('nox_raw', 0))
+                    voc = float(data.get('voc_index', 0))
+                    nox = float(data.get('nox_index', 0))
 
                     sgp_timestamps.append(data_time)
                     voc_data.append(voc)
@@ -211,13 +213,15 @@ def update_data(frame):
     if pm25_data:
         ax3.set_title(f'PM1.0: {pm1_data[-1]}, PM2.5: {pm25_data[-1]}, PM10: {pm10_data[-1]}')
 
-    ax4.set_ylabel('VOC Raw')
+    ax4.set_ylabel('VOC Index')
+    ax4.set_ylim(0, 500)
     if voc_data:
-        ax4.set_title(f'VOC Raw: {voc_data[-1]:.0f}')
+        ax4.set_title(f'VOC Index: {voc_data[-1]:.0f}')
         
-    ax5.set_ylabel('NOx Raw')
+    ax5.set_ylabel('NOx Index')
+    ax5.set_ylim(0, 500)
     if nox_data:
-        ax5.set_title(f'NOx Raw: {nox_data[-1]:.0f}')
+        ax5.set_title(f'NOx Index: {nox_data[-1]:.0f}')
         
     ax6.set_ylabel('Accel Intensity (m/s²)')
     ax6.set_xlabel('Time')

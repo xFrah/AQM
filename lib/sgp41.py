@@ -7,11 +7,14 @@ import time
 import struct
 from machine import I2C
 from typing import Tuple, Optional
+from sgp41_gas_index_algorithm import GasIndexAlgorithm
 
 class SGP41:
-    def __init__(self, i2c: I2C, address: int = 0x59) -> None:
+    def __init__(self, i2c: I2C, address: int = 0x59, sampling_interval: float = 1.0) -> None:
         self._i2c = i2c
         self._addr = address
+        self._voc_algo = GasIndexAlgorithm(GasIndexAlgorithm.ALGORITHM_TYPE_VOC, sampling_interval)
+        self._nox_algo = GasIndexAlgorithm(GasIndexAlgorithm.ALGORITHM_TYPE_NOX, sampling_interval)
 
     def _crc(self, data: bytes) -> int:
         crc = 0xFF
@@ -130,6 +133,84 @@ class SGP41:
         words = struct.unpack('>HHH', resp)
         return (words[0] << 32) | (words[1] << 16) | words[2]
         
+    def measure_index(self, relative_humidity: Optional[float] = None, temperature: Optional[float] = None) -> Tuple[int, int]:
+        """
+        Read raw signals and compute VOC and NOx gas index values.
+        
+        This should be called once per sampling interval (default 1s).
+        The first ~45 seconds are a blackout period where both indexes return 0.
+        After that, indexes range from 1 to 500.
+        
+        Args:
+            relative_humidity: RH in %  (0-100), or None for default (50%)
+            temperature:       Temp in °C, or None for default (25°C)
+        
+        Returns:
+            tuple(int, int) -> (voc_index, nox_index)
+        """
+        sraw_voc, sraw_nox = self.measure_raw(relative_humidity, temperature)
+        voc_index = self._voc_algo.process(sraw_voc)
+        nox_index = self._nox_algo.process(sraw_nox)
+        return voc_index, nox_index
+
+    def get_voc_index(self, relative_humidity: Optional[float] = None, temperature: Optional[float] = None) -> int:
+        """
+        Read raw signals and return only the VOC index.
+        
+        Note: This also advances the NOx algorithm state internally.
+        Call once per sampling interval.
+        
+        Returns:
+            int: VOC index (0 during blackout, 1..500 afterwards)
+        """
+        voc_index, _ = self.measure_index(relative_humidity, temperature)
+        return voc_index
+
+    def get_nox_index(self, relative_humidity: Optional[float] = None, temperature: Optional[float] = None) -> int:
+        """
+        Read raw signals and return only the NOx index.
+        
+        Note: This also advances the VOC algorithm state internally.
+        Call once per sampling interval.
+        
+        Returns:
+            int: NOx index (0 during blackout, 1..500 afterwards)
+        """
+        _, nox_index = self.measure_index(relative_humidity, temperature)
+        return nox_index
+
+    def reset_index_algorithm(self) -> None:
+        """
+        Reset both VOC and NOx index algorithm states.
+        Call this when resuming after a measurement interruption.
+        Previously set tuning parameters are preserved.
+        """
+        self._voc_algo.reset()
+        self._nox_algo.reset()
+
+    def get_voc_states(self) -> Tuple[float, float]:
+        """
+        Get current VOC algorithm states for persistence.
+        Can be used to skip the initial learning phase after a short interruption.
+        NOTE: Only valid after at least 3 hours of continuous operation.
+        
+        Returns:
+            tuple(float, float) -> (state0, state1)
+        """
+        return self._voc_algo.get_states()
+
+    def set_voc_states(self, state0: float, state1: float) -> None:
+        """
+        Restore previously saved VOC algorithm states to skip initial learning phase.
+        Do not use after interruptions longer than 10 minutes.
+        Call this once after init/reset.
+        
+        Args:
+            state0: Previously saved state0
+            state1: Previously saved state1
+        """
+        self._voc_algo.set_states(state0, state1)
+
     # Alias methods
     def conditioning(self, relative_humidity: Optional[float] = None, temperature: Optional[float] = None) -> int:
         return self.execute_conditioning(relative_humidity, temperature)

@@ -43,6 +43,10 @@ def main():
     scd.start_periodic_measurement()
     print("Waiting for data...")
 
+    # Last known environment values for SGP41 compensation
+    last_rh = None
+    last_temp = None
+
     while True:
         if pms.data_ready:
             try:
@@ -61,13 +65,15 @@ def main():
 
         if scd.data_ready:
             try:
+                last_temp = scd.temperature
+                last_rh = scd.relative_humidity
                 print(
                     json.dumps(
                         {
                             "sensor": "scd41",
                             "co2": scd.CO2,
-                            "temperature": scd.temperature,
-                            "humidity": scd.relative_humidity,
+                            "temperature": last_temp,
+                            "humidity": last_rh,
                         }
                     )
                 )
@@ -76,13 +82,17 @@ def main():
 
         if sgp:
             try:
-                voc, nox = sgp.measure_raw()
+                sraw_voc, sraw_nox = sgp.measure_raw(last_rh, last_temp)
+                voc_index = sgp._voc_algo.process(sraw_voc)
+                nox_index = sgp._nox_algo.process(sraw_nox)
                 print(
                     json.dumps(
                         {
                             "sensor": "sgp41",
-                            "voc_raw": voc,
-                            "nox_raw": nox,
+                            "voc_raw": sraw_voc,
+                            "nox_raw": sraw_nox,
+                            "voc_index": voc_index,
+                            "nox_index": nox_index,
                         }
                     )
                 )
