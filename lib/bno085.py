@@ -249,12 +249,12 @@ def _parse_sensor_report_data(report_bytes: bytearray) -> Tuple[Tuple[float, ...
     else:
         format_str = "<h"
     results = []
-    accuracy = unpack_from("<B", report_bytes, offset=2)[0]
+    accuracy = unpack_from("<B", report_bytes, 2)[0]
     accuracy &= 0b11
 
     for _offset_idx in range(count):
         total_offset = data_offset + (_offset_idx * 2)
-        raw_data = unpack_from(format_str, report_bytes, offset=total_offset)[0]
+        raw_data = unpack_from(format_str, report_bytes, total_offset)[0]
         scaled_data = raw_data * scalar
         results.append(scaled_data)
     results_tuple = tuple(results)
@@ -262,10 +262,10 @@ def _parse_sensor_report_data(report_bytes: bytearray) -> Tuple[Tuple[float, ...
     return (results_tuple, accuracy)
 
 def _parse_step_couter_report(report_bytes: bytearray) -> int:
-    return unpack_from("<H", report_bytes, offset=8)[0]
+    return unpack_from("<H", report_bytes, 8)[0]
 
 def _parse_stability_classifier_report(report_bytes: bytearray) -> str:
-    classification_bitfield = unpack_from("<B", report_bytes, offset=4)[0]
+    classification_bitfield = unpack_from("<B", report_bytes, 4)[0]
     return ["Unknown", "On Table", "Stationary", "Stable", "In motion"][classification_bitfield]
 
 def _parse_get_feature_response_report(report_bytes: bytearray) -> Tuple[Any, ...]:
@@ -284,10 +284,10 @@ def _parse_activity_classifier_report(report_bytes: bytearray) -> Dict[str, Any]
         "OnStairs",
     ]
 
-    end_and_page_number = unpack_from("<B", report_bytes, offset=4)[0]
+    end_and_page_number = unpack_from("<B", report_bytes, 4)[0]
     page_number = end_and_page_number & 0x7F
-    most_likely = unpack_from("<B", report_bytes, offset=5)[0]
-    confidences = unpack_from("<BBBBBBBBB", report_bytes, offset=6)
+    most_likely = unpack_from("<B", report_bytes, 5)[0]
+    confidences = unpack_from("<BBBBBBBBB", report_bytes, 6)
 
     classification = {}
     classification["most_likely"] = activities[most_likely]
@@ -298,7 +298,7 @@ def _parse_activity_classifier_report(report_bytes: bytearray) -> Dict[str, Any]
     return classification
 
 def _parse_shake_report(report_bytes: bytearray) -> bool:
-    shake_bitfield = unpack_from("<H", report_bytes, offset=4)[0]
+    shake_bitfield = unpack_from("<H", report_bytes, 4)[0]
     return (shake_bitfield & 0x111) > 0
 
 def parse_sensor_id(buffer: bytearray) -> Tuple[int, ...]:
@@ -306,17 +306,17 @@ def parse_sensor_id(buffer: bytearray) -> Tuple[int, ...]:
     if not buffer[0] == _SHTP_REPORT_PRODUCT_ID_RESPONSE:
         raise AttributeError("Wrong report id for sensor id: %s" % hex(buffer[0]))
 
-    sw_major = unpack_from("<B", buffer, offset=2)[0]
-    sw_minor = unpack_from("<B", buffer, offset=3)[0]
-    sw_patch = unpack_from("<H", buffer, offset=12)[0]
-    sw_part_number = unpack_from("<I", buffer, offset=4)[0]
-    sw_build_number = unpack_from("<I", buffer, offset=8)[0]
+    sw_major = unpack_from("<B", buffer, 2)[0]
+    sw_minor = unpack_from("<B", buffer, 3)[0]
+    sw_patch = unpack_from("<H", buffer, 12)[0]
+    sw_part_number = unpack_from("<I", buffer, 4)[0]
+    sw_build_number = unpack_from("<I", buffer, 8)[0]
 
     return (sw_part_number, sw_major, sw_minor, sw_patch, sw_build_number)
 
 def _parse_command_response(report_bytes: bytearray) -> Tuple[Tuple[Any, ...], Tuple[Any, ...]]:
     report_body = unpack_from("<BBBBB", report_bytes)
-    response_values = unpack_from("<BBBBBBBBBBB", report_bytes, offset=5)
+    response_values = unpack_from("<BBBBBBBBBBB", report_bytes, 5)
     return (report_body, response_values)
 
 def _insert_command_request_report(
@@ -434,8 +434,8 @@ class Packet:
         """Creates a `PacketHeader` object from a given buffer"""
         packet_byte_count = unpack_from("<H", packet_bytes)[0]
         packet_byte_count &= ~0x8000
-        channel_number = unpack_from("<B", packet_bytes, offset=2)[0]
-        sequence_number = unpack_from("<B", packet_bytes, offset=3)[0]
+        channel_number = unpack_from("<B", packet_bytes, 2)[0]
+        sequence_number = unpack_from("<B", packet_bytes, 3)[0]
         data_length = max(0, packet_byte_count - 4)
 
         header = PacketHeader(channel_number, sequence_number, data_length, packet_byte_count)
@@ -1030,7 +1030,7 @@ class BNO085:
 
     def _get_data(self, index: int, fmt_string: str) -> Any:
         data_index = index + 4
-        return unpack_from(fmt_string, self._data_buffer, offset=data_index)[0]
+        return unpack_from(fmt_string, self._data_buffer, data_index)[0]
 
     def hard_reset(self) -> None:
         """Hardware reset the sensor to an initial unconfigured state"""
