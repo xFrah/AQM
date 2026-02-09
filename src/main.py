@@ -2,7 +2,6 @@ import time
 import json
 from machine import I2C, Pin
 import lib.scd4x as scd4x
-import lib.bno085 as bno085
 import lib.sgp41 as sgp41
 from lib.pms7003 import Pms7003
 
@@ -17,18 +16,6 @@ def main():
     # Initialize PMS7003 sensor
     # Configure UART1 with TX=25, RX=26
     pms = Pms7003(uart=2, tx=Pin(25), rx=Pin(26))
-
-    # Initialize BNO085
-    try:
-        bno = bno085.BNO085(i2c)
-        bno.enable_feature(bno085.BNO_REPORT_ACCELEROMETER)
-        bno.enable_feature(bno085.BNO_REPORT_GYROSCOPE)
-        bno.enable_feature(bno085.BNO_REPORT_MAGNETOMETER)
-        bno.enable_feature(bno085.BNO_REPORT_ROTATION_VECTOR)
-        print("BNO085 initialized")
-    except Exception as e:
-        print("Failed to initialize BNO085:", e)
-        bno = None
 
     # Initialize SGP41
     try:
@@ -98,26 +85,6 @@ def main():
                 )
             except Exception as e:
                 print("SGP41 error:", e)
-
-        if bno:
-            try:
-                accel = bno.acceleration
-                gyro = bno.gyro
-                mag = bno.magnetic
-                quat = bno.quaternion
-                print(
-                    json.dumps(
-                        {
-                            "sensor": "bno085",
-                            "accel": accel,
-                            "gyro": gyro,
-                            "mag": mag,
-                            "quat": quat,
-                        }
-                    )
-                )
-            except Exception as e:
-                print("BNO085 error:", e)
 
         time.sleep(1)
 

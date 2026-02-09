@@ -30,8 +30,6 @@ sgp_timestamps = collections.deque()
 voc_data = collections.deque()
 nox_data = collections.deque()
 
-bno_timestamps = collections.deque()
-accel_data = collections.deque()
 
 def calculate_moving_average(data, window_size):
     """Calculates the simple moving average."""
@@ -99,11 +97,6 @@ ax5.set_ylabel('NOx Index')
 ax5.set_ylim(0, 500)
 ax5.grid(True)
 
-ax6.set_ylabel('Accel Intensity (m/s²)')
-ax6.set_xlabel('Time')
-ax6.grid(True)
-
-
 # Date formatter for x-axis
 date_fmt = mdates.DateFormatter('%H:%M:%S')
 ax3.xaxis.set_major_formatter(date_fmt)
@@ -165,19 +158,6 @@ def update_data(frame):
                         voc_data.popleft()
                         nox_data.popleft()
 
-                elif sensor_type == "bno085":
-                    accel = data.get('accel')
-                    if accel and len(accel) == 3:
-                        x, y, z = accel
-                        intensity = math.sqrt(x*x + y*y + z*z)
-                        
-                        bno_timestamps.append(data_time)
-                        accel_data.append(intensity)
-
-                        while bno_timestamps and bno_timestamps[0] < cutoff:
-                            bno_timestamps.popleft()
-                            accel_data.popleft()
-
             except json.JSONDecodeError:
                 # Fallback or ignore non-JSON lines
                 pass
@@ -223,11 +203,6 @@ def update_data(frame):
     if nox_data:
         ax5.set_title(f'NOx Index: {nox_data[-1]:.0f}')
         
-    ax6.set_ylabel('Accel Intensity (m/s²)')
-    ax6.set_xlabel('Time')
-    if accel_data:
-        ax6.set_title(f'Accel: {accel_data[-1]:.2f} m/s²')
-
     # Plot data if available
     if timestamps:
         co2_ma = calculate_moving_average(co2_data, MOVING_AVERAGE_WINDOW)
@@ -253,13 +228,8 @@ def update_data(frame):
         ax4.plot(sgp_timestamps, voc_ma, 'c-', label='VOC')
         ax5.plot(sgp_timestamps, nox_ma, 'k-', label='NOx')
 
-    if bno_timestamps:
-        accel_ma = calculate_moving_average(accel_data, 5) # Smaller window for accel
-        ax6.plot(bno_timestamps, accel_ma, 'purple', label='Intensity')
-
     # Set fixed time window
     ax3.set_xlim(min_time, max_time)
-    ax6.set_xlim(min_time, max_time)
     
     # Format x-axis
     ax3.xaxis.set_major_formatter(date_fmt)

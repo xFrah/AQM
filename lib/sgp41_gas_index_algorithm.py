@@ -4,7 +4,6 @@ Copyright (c) 2022, Sensirion AG
 BSD-3-Clause License
 
 Ported from C version 3.2.0
-Source: lib/gas_index/algorithm.c + sensirion_gas_index_algorithm_headers.h
 
 Variable mapping (C struct field -> Python attribute):
   mAlgorithm_Type                                    -> _algorithm_type
