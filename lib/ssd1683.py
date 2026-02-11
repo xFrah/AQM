@@ -413,7 +413,7 @@ class SSD1683(FrameBuffer):
         self._dat(0x01)  # Enter deep sleep
         sleep_ms(100)
 
-    def fill_rect_partial(self, x, y, w, h, color):
+    def fill_rect_partial(self, x, y, w, h, color, update=True):
         """
         Fill a rectangle and update only that region
         Convenience method combining drawing and partial update
@@ -426,9 +426,10 @@ class SSD1683(FrameBuffer):
         # Draw to framebuffer
         self.fill_rect(x, y, w, h, color)
         # Update only that region
-        self.show_partial(x, y, w, h)
+        if update:
+            self.show_partial(x, y, w, h)
 
-    def text_partial(self, text, x, y, color=0):
+    def text_partial(self, text, x, y, color=0, update=True):
         """
         Draw text and update only the affected region
         Note: Requires x to be aligned to 8 pixels
@@ -447,7 +448,8 @@ class SSD1683(FrameBuffer):
         # Draw text
         self.text(text, x, y, color)
         # Partial update
-        self.show_partial(x, y, w, h)
+        if update:
+            self.show_partial(x, y, w, h)
 
 
 # ============ Usage Example ============

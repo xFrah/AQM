@@ -43,12 +43,12 @@ def main():
     # display.fill(1)
     display.clear()
     
-    # Fixed Y positions for each data type
+    # Fixed Y positions for each data type (20px apart, no overlap)
     Y_CO2 = 20
-    Y_TEMP = 35
-    Y_HUM = 50
-    Y_VOC = 20
-    Y_NOX = 35
+    Y_TEMP = 40
+    Y_HUM = 60
+    Y_VOC = 80
+    Y_NOX = 100
     
     # Last known environment values for SGP41 compensation
     last_rh = None
@@ -65,11 +65,13 @@ def main():
     def update_text(y_pos, text):
         """Clear text area and draw new text only if content changed"""
         # Clear the 20px high area at this position
-        display.fill_rect_partial(0, y_pos, 400, 20, 1)
-        display.show_partial(0, y_pos, 400, 20)
-        display.text_partial(text, 0, y_pos)
+        # First draw text, then clear, then redraw text, then show
+        display.fill_rect_partial(0, y_pos, 400, 20, 1, update=False)  # Clear the rectangle
+        display.text_partial(text, 0, y_pos, 0, update=False)  # Redraw text after clearing
+        # display.show_partial(0, y_pos, 400, 20)  # Show only this region
 
     while True:
+        # display.clear()
         # Update display with latest CO2 data
         
         # PMS7003 temporarily disabled
@@ -100,76 +102,71 @@ def main():
         #         y += 15
 
         if scd.data_ready:
-            try:
-                last_temp = scd.temperature
-                last_rh = scd.relative_humidity
-                co2_value = scd.CO2
-                
-                # Update CO2 only if changed
-                if co2_value != prev_co2:
-                    update_text(Y_CO2, f'CO2:   {co2_value} ppm')
-                    prev_co2 = co2_value
-                
-                # Update Temp only if changed
-                if last_temp != prev_temp:
-                    update_text(Y_TEMP, f'Temp:  {last_temp:.1f} C')
-                    prev_temp = last_temp
-                
-                # Update Hum only if changed
-                if last_rh != prev_hum:
-                    update_text(Y_HUM, f'Hum:   {last_rh:.1f} %')
-                    prev_hum = last_rh
-                print(
-                    json.dumps(
-                        {
-                            "sensor": "scd41",
-                            "co2": co2_value,
-                            "temperature": last_temp,
-                            "humidity": last_rh,
-                        }
-                    )
+            last_temp = scd.temperature
+            last_rh = scd.relative_humidity
+            co2_value = scd.CO2
+            
+            # Update CO2 only if changed
+            if co2_value != prev_co2:
+                update_text(Y_CO2, f'CO2:   {co2_value} ppm')
+                prev_co2 = co2_value
+            
+            # Update Temp only if changed
+            if last_temp != prev_temp:
+                update_text(Y_TEMP, f'Temp:  {last_temp:.1f} C')
+                prev_temp = last_temp
+            
+            # Update Hum only if changed
+            if last_rh != prev_hum:
+                update_text(Y_HUM, f'Hum:   {last_rh:.1f} %')
+                prev_hum = last_rh
+            print(
+                json.dumps(
+                    {
+                        "sensor": "scd41",
+                        "co2": co2_value,
+                        "temperature": last_temp,
+                        "humidity": last_rh,
+                    }
                 )
-            except Exception as e:
-                print("SCD41 error:", e)
-                display.text_partial('SCD41 error', 0, Y_CO2)
+            )
 
         if sgp:
-            try:
-                sraw_voc, sraw_nox = sgp.measure_raw(last_rh, last_temp)
-                voc_index = sgp._voc_algo.process(sraw_voc)
-                nox_index = sgp._nox_algo.process(sraw_nox)
-                
-                # Update VOC only if changed
-                if voc_index != prev_voc:
-                    update_text(Y_VOC, f'VOC:   {voc_index} idx')
-                    prev_voc = voc_index
-                
-                # Update NOx only if changed
-                if nox_index != prev_nox:
-                    update_text(Y_NOX, f'NOx:   {nox_index} idx')
-                    prev_nox = nox_index
-                print(
-                    json.dumps(
-                        {
-                            "sensor": "sgp41",
-                            "voc_raw": sraw_voc,
-                            "nox_raw": sraw_nox,
-                            "voc_index": voc_index,
-                            "nox_index": nox_index,
-                        }
-                    )
+            sraw_voc, sraw_nox = sgp.measure_raw(last_rh, last_temp)
+            voc_index = sgp._voc_algo.process(sraw_voc)
+            nox_index = sgp._nox_algo.process(sraw_nox)
+            
+            # Update VOC only if changed
+            if voc_index != prev_voc:
+                update_text(Y_VOC, f'VOC:   {voc_index} idx')
+                prev_voc = voc_index
+            
+            # Update NOx only if changed
+            if nox_index != prev_nox:
+                update_text(Y_NOX, f'NOx:   {nox_index} idx')
+                prev_nox = nox_index
+            print(
+                json.dumps(
+                    {
+                        "sensor": "sgp41",
+                        "voc_raw": sraw_voc,
+                        "nox_raw": sraw_nox,
+                        "voc_index": voc_index,
+                        "nox_index": nox_index,
+                    }
                 )
-            except Exception as e:
-                print("SGP41 error:", e)
-                display.text_partial('SGP41 error', 0, Y_VOC)
+            )
         else:
             # Clear VOC/NOx positions when sensor not available
-            display.fill_rect_partial(0, Y_VOC, 400, 20, 1)
-            display.show_partial(0, Y_VOC, 400, 20)
-            display.fill_rect_partial(0, Y_NOX, 400, 20, 1)
-            display.show_partial(0, Y_NOX, 400, 20)
+            # display.fill_rect_partial(0, Y_VOC, 400, 20, 1)
+            # display.show_partial(0, Y_VOC, 400, 20)
+            # display.fill_rect_partial(0, Y_NOX, 400, 20, 1)
+            # display.show_partial(0, Y_NOX, 400, 20)
             prev_voc = None
             prev_nox = None
+            
+        # update partial all text
+        display.show_partial(0, 0, 400, 120)
 
         time.sleep(1)
 
