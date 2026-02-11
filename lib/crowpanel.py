@@ -1,17 +1,17 @@
 from machine import Pin, SDCard
 
-SSD1638_WIDTH  = const(400)
-SSD1638_HEIGHT = const(300)
+SSD1683_WIDTH  = const(400)
+SSD1683_HEIGHT = const(300)
 
-SSD1638_PWR    = const(7)
-SSD1638_CS     = const(45)
-SSD1638_DC     = const(46)
-SSD1638_RST    = const(47)
-SSD1638_BUSY   = const(48)
+SSD1683_PWR    = const(7)
+SSD1683_CS     = const(45)
+SSD1683_DC     = const(46)
+SSD1683_RST    = const(47)
+SSD1683_BUSY   = const(48)
 
-SSD1638_SPI    = const(1)
-SSD1638_SCK    = const(12)
-SSD1638_MOSI   = const(11)
+SSD1683_SPI    = const(1)
+SSD1683_SCK    = const(12)
+SSD1683_MOSI   = const(11)
 
 SDCARD_SLOT    = const(2)
 SDCARD_PWR     = const(42)
@@ -40,17 +40,19 @@ class CrowPanel42(object):
 
     def get_display(self):
         if self._display is None:
-            import ssd1638
-            Pin(SSD1638_PWR, Pin.OUT, value=1)
-            self._display = ssd1638.SSD1638(SSD1638_WIDTH,
-                                            SSD1638_HEIGHT,
-                                            SSD1638_CS,
-                                            SSD1638_DC,
-                                            SSD1638_RST,
-                                            SSD1638_BUSY,
-                                            SSD1638_SPI,
-                                            SSD1638_SCK,
-                                            SSD1638_MOSI)
+            import ssd1683
+            Pin(SSD1683_PWR, Pin.OUT, value=1)
+            self._display = ssd1683.SSD1683(SSD1683_WIDTH,
+                                            SSD1683_HEIGHT,
+                                            SSD1683_CS,
+                                            SSD1683_DC,
+                                            SSD1683_RST,
+                                            SSD1683_BUSY,
+                                            SSD1683_SPI,
+                                            SSD1683_SCK,
+                                            SSD1683_MOSI)
+            # Initialize in fast mode for partial updates
+            self._display.init_fast(mode_1s=True)
         return self._display
 
     def mount_sdcard(self, path):
