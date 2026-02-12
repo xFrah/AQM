@@ -1,12 +1,48 @@
 import time
 import json
+from typing import Dict, Union
 from machine import I2C, Pin, SDCard
 import lib.scd4x as scd4x
+from ucollections import OrderedDict
 import lib.sgp41 as sgp41
 from lib.pms7003 import Pms7003
+import lib.hdc302x as hdc302x
 
 # Import CrowPanel for e-ink display
 import lib.crowpanel as crowpanel
+
+prev_dict: "OrderedDict[str, Union[float, None, int]]" = OrderedDict({
+    "CO2": None,
+    "Temperature": None,
+    "Humidity": None,
+    "VOC Index": None,
+    "NOx Index": None,
+    "PM1.0": None,
+    "PM2.5": None,
+    "PM10": None,
+})
+
+current_dict: "OrderedDict[str, Union[float, None, int]]" = OrderedDict({
+    "CO2": None,
+    "Temperature": None,
+    "Humidity": None,
+    "VOC Index": None,
+    "NOx Index": None,
+    "PM1.0": None,
+    "PM2.5": None,
+    "PM10": None,
+})
+
+unit_dict: Dict[str, str] = {
+    "CO2": "ppm",
+    "Temperature": "C",
+    "Humidity": "%",
+    "VOC Index": "idx",
+    "NOx Index": "idx",
+    "PM1.0": "ug/m3",
+    "PM2.5": "ug/m3",
+    "PM10": "ug/m3",
+}
 
 
 def main():
@@ -31,6 +67,14 @@ def main():
         print("Failed to initialize SGP41:", e)
         sgp = None
 
+    # Initialize HDC302x sensor
+    try:
+        hdc = hdc302x.HDC302x(i2c)
+        print("HDC302x initialized")
+    except Exception as e:
+        print("Failed to initialize HDC302x:", e)
+        hdc = None
+
     scd.start_periodic_measurement()
     print("Waiting for data...")
 
@@ -38,29 +82,11 @@ def main():
     panel = crowpanel.CrowPanel42()
     panel.led.on()
     display = panel.get_display()
-    
+
     # Clear display and show initial message
     # display.fill(1)
     display.clear()
-    
-    # Fixed Y positions for each data type (20px apart, no overlap)
-    Y_CO2 = 20
-    Y_TEMP = 40
-    Y_HUM = 60
-    Y_VOC = 80
-    Y_NOX = 100
-    
-    # Last known environment values for SGP41 compensation
-    last_rh = None
-    last_temp = None
-    
-    # Track previous values for change detection
-    prev_co2 = None
-    prev_temp = None
-    prev_hum = None
-    prev_voc = None
-    prev_nox = None
-    
+
     # Helper function to clear and update text at a position
     def update_text(y_pos, text):
         """Clear text area and draw new text only if content changed"""
@@ -73,7 +99,7 @@ def main():
     while True:
         # display.clear()
         # Update display with latest CO2 data
-        
+
         # PMS7003 temporarily disabled
         # if pms.data_ready:
         #     try:
@@ -102,49 +128,48 @@ def main():
         #         y += 15
 
         if scd.data_ready:
-            last_temp = scd.temperature
-            last_rh = scd.relative_humidity
             co2_value = scd.CO2
-            
-            # Update CO2 only if changed
-            if co2_value != prev_co2:
-                update_text(Y_CO2, f'CO2:   {co2_value} ppm')
-                prev_co2 = co2_value
-            
-            # Update Temp only if changed
-            if last_temp != prev_temp:
-                update_text(Y_TEMP, f'Temp:  {last_temp:.1f} C')
-                prev_temp = last_temp
-            
-            # Update Hum only if changed
-            if last_rh != prev_hum:
-                update_text(Y_HUM, f'Hum:   {last_rh:.1f} %')
-                prev_hum = last_rh
+            prev_dict["CO2"] = current_dict["CO2"]
+            current_dict["CO2"] = co2_value
+
             print(
                 json.dumps(
                     {
                         "sensor": "scd41",
                         "co2": co2_value,
-                        "temperature": last_temp,
-                        "humidity": last_rh,
+                    }
+                )
+            )
+            
+        if hdc:
+            hdc_temp = hdc.temperature
+            hdc_hum = hdc.relative_humidity
+            
+            prev_dict["Temperature"] = current_dict["Temperature"]
+            current_dict["Temperature"] = round(hdc_temp, 1)
+            prev_dict["Humidity"] = current_dict["Humidity"]
+            current_dict["Humidity"] = round(hdc_hum, 1)
+
+            print(
+                json.dumps(
+                    {
+                        "sensor": "hdc302x",
+                        "temperature": hdc_temp,
+                        "humidity": hdc_hum,
                     }
                 )
             )
 
         if sgp:
-            sraw_voc, sraw_nox = sgp.measure_raw(last_rh, last_temp)
+            sraw_voc, sraw_nox = sgp.measure_raw(current_dict["Humidity"], current_dict["Temperature"])
             voc_index = sgp._voc_algo.process(sraw_voc)
             nox_index = sgp._nox_algo.process(sraw_nox)
-            
-            # Update VOC only if changed
-            if voc_index != prev_voc:
-                update_text(Y_VOC, f'VOC:   {voc_index} idx')
-                prev_voc = voc_index
-            
-            # Update NOx only if changed
-            if nox_index != prev_nox:
-                update_text(Y_NOX, f'NOx:   {nox_index} idx')
-                prev_nox = nox_index
+
+            prev_dict["VOC Index"] = current_dict["VOC Index"]
+            current_dict["VOC Index"] = voc_index
+            prev_dict["NOx Index"] = current_dict["NOx Index"]
+            current_dict["NOx Index"] = nox_index
+
             print(
                 json.dumps(
                     {
@@ -156,17 +181,13 @@ def main():
                     }
                 )
             )
-        else:
-            # Clear VOC/NOx positions when sensor not available
-            # display.fill_rect_partial(0, Y_VOC, 400, 20, 1)
-            # display.show_partial(0, Y_VOC, 400, 20)
-            # display.fill_rect_partial(0, Y_NOX, 400, 20, 1)
-            # display.show_partial(0, Y_NOX, 400, 20)
-            prev_voc = None
-            prev_nox = None
             
-        # update partial all text
-        display.show_partial(0, 0, 400, 120)
+        for i, (key, value) in enumerate(current_dict.items()):
+            if value is not None:
+                update_text(i * 20, f"{key}: {value} {unit_dict[key]}")
+
+        # update partial all text (include all Y positions up to Y_NOX + 20)
+        display.show_partial(0, 0, 400, len(current_dict) * 20)
 
         time.sleep(1)
 
