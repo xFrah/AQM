@@ -1,4 +1,4 @@
-import time
+import utime as time
 import json
 from typing import Dict, Union
 from machine import I2C, Pin, SDCard
@@ -10,6 +10,9 @@ import lib.hdc302x as hdc302x
 
 # Import CrowPanel for e-ink display
 import lib.crowpanel as crowpanel
+
+# Track boot time for the first 30 seconds
+boot_time = time.ticks_ms()
 
 prev_dict: "OrderedDict[str, Union[float, None, int]]" = OrderedDict(
     {
@@ -54,12 +57,41 @@ def update_text(y_pos, text):
     """Clear text area and draw new text only if content changed"""
     # Clear the 20px high area at this position
     # First draw text, then clear, then redraw text, then show
-    display.fill_rect_partial(0, y_pos, 400, 20, 1, update=False)  # Clear the rectangle
-    display.text_partial(text, 0, y_pos, 0, update=False)  # Redraw text after clearing
+    display.fill_rect(0, y_pos, 400, 20, 1)  # Clear the rectangle
+    display.text(text, 0, y_pos, 0)  # Redraw text after clearing
     # display.show_partial(0, y_pos, 400, 20)  # Show only this region
 
 
+def format_sensor_output(name: str, value: Union[float, int, None], unit: str) -> str:
+    """
+    Format sensor output with 3 columns:
+    - Column 1: Name (left aligned)
+    - Column 2: Value (right aligned, starts at longest_name_length + 5)
+    - Column 3: Unit (left aligned, 1 space after value)
+    
+    Example: "Temperature  23.5 C"
+    """
+    if value is None:
+        return name
+    
+    # Convert value to string
+    value_str = str(value)
+    
+    # Find the length of the longest key in current_dict
+    longest_key_length = max(len(k) for k in current_dict.keys())
+    
+    # Value column starts at longest_key_length + 5
+    value_start_position = longest_key_length + 7
+    
+    # Format: name padded to value_start_position - len(value_str), then value, then unit
+    formatted = f"{name:<{value_start_position - len(value_str)}}{value_str} {unit}"
+    
+    return formatted
+
+
 def main():
+    last_update_time = None  # Track when screen was last updated
+    screen_update_enabled = False  # Only enable screen updates after 30 seconds from boot
     i2c = I2C(0, sda=Pin(8), scl=Pin(3), freq=100000)
 
     # Initialize SCD4X sensor
@@ -106,7 +138,7 @@ def main():
     display.clear()
 
     rotator = ["-", "\\", "|", "/"]
-    rotator_index = 0
+    rotator_index: int = 0
     while True:
         # display.clear()
         # Update display with latest CO2 data
@@ -192,14 +224,31 @@ def main():
                 )
             )
 
-        for i, (key, value) in enumerate(current_dict.items()):
-            if value is not None:
-                update_text((i + 1) * 20, f"{key}: {value} {unit_dict[key]}")
-        rotator_index = 0 if rotator_index >= len(rotator) - 1 else rotator_index + 1
-        update_text(0, rotator[rotator_index])
+        def update_text_and_show():
+            nonlocal rotator_index
+            for i, (key, value) in enumerate(current_dict.items()):
+                if value is not None:
+                    formatted = format_sensor_output(key, value, unit_dict[key])
+                    update_text((i + 1) * 20, formatted)
+            rotator_index = 0 if rotator_index >= len(rotator) - 1 else rotator_index + 1
+            update_text(0, rotator[rotator_index])
+            display.show_partial(0, 0, 400, (len(current_dict) + 1) * 20)
 
         # update partial all text (include all Y positions up to Y_NOX + 20)
-        display.show_partial(0, 0, 400, (len(current_dict) + 1) * 20)
+
+        # Check if 30 seconds have passed since boot
+        if not screen_update_enabled and time.ticks_diff(time.ticks_ms(), boot_time) >= 10000:
+            screen_update_enabled = True
+
+        # Only update screen if enabled and last update was at least 30 seconds ago
+        if screen_update_enabled:
+            if last_update_time is None or time.ticks_diff(time.ticks_ms(), last_update_time) >= 10000:
+                update_text_and_show()
+                last_update_time = time.ticks_ms()
+        else:
+            # During first 30 seconds, update screen every time
+            update_text_and_show()
+            last_update_time = time.ticks_ms()
 
         time.sleep(1)
 
